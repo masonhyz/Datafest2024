@@ -1,0 +1,118 @@
+---
+title: "DATAFEST"
+author: "Penny Yang - 1007709712"
+date: "2024-04-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+install.packages("betareg")
+library(betareg)
+page_view <- read.csv("full_03_04/page_views.csv")
+respones <- read.csv("full_03_04/responses.csv")
+item <- read.csv("full_03_04/items.csv")
+media_view <- read.csv("full_03_04/media_views.csv")
+checkpoints_pulse <- read.csv("full_03_04/checkpoints_pulse.csv")
+checkpoints_eoc <- read.csv("full_03_04/checkpoints_eoc.csv")
+```
+
+
+```{r}
+student_id <- checkpoints_eoc %>% 
+  group_by(student_id) %>% 
+  summarise(avg = mean(EOC))
+student_id
+```
+
+```{r}
+chapter_questions_length <- item %>%
+  group_by(chapter_number) %>% 
+  summarise(n = n())
+
+page_view_chapter <- page_view %>%
+  group_by(chapter) %>% 
+  summarise(n = n())
+
+page_view_chapter <- page_view_chapter %>%
+  mutate(chapter_num = as.integer(sub("Chapter (\\d+).*", "\\1", chapter))) %>% 
+  arrange(chapter_num)
+
+page_view_chapter <- page_view_chapter[,1:2]
+page_view_chapter
+
+```
+```{r}
+checkpoints_pulse_ordered <- checkpoints_pulse %>% 
+  arrange(student_id) %>% 
+  na.omit()
+
+checkpoints_pulse_ordered<-checkpoints_pulse_ordered %>% 
+  group_by(chapter_page,construct) %>% 
+  summarise(mean = mean(response))
+
+boxplot(mean ~ chapter_number,
+        data = checkpoints_pulse_ordered)
+ggplot(data = checkpoints_pulse_ordered, aes(x=factor(chapter_number), y=mean)) + geom_boxplot(aes(fill=construct))
+
+page_view_ordered <- page_view %>% 
+  arrange(student_id) %>% 
+  na.omit()
+page_view_ordered <- page_view_ordered %>% 
+  group_by(chapter_number,student_id) %>% 
+  summarise(avg_engaged = mean(engaged)) %>% 
+  mutate(log_avg = log(avg_engaged))
+
+
+
+
+```
+
+
+```{r}
+respones_new<-respones %>% 
+  group_by(page,student_id) %>% 
+  summarise(correction_rate = sum(points_earned/points_possible)/n())
+
+sum(is.na(respones_new$correction_rate))
+
+page_view_ordered <- page_view[!is.na(page_view$engaged),]
+page_view_ordered <- page_view_ordered %>% 
+  group_by(page,student_id) %>% 
+  summarise(avg_engaged = mean(engaged)) %>% 
+  mutate(log_avg = log(avg_engaged))
+
+sum(is.na(page_view_ordered$avg_engaged))
+
+data <- merge(respones_new,page_view_ordered) %>% 
+  na.omit()
+
+plot(correction_rate ~ log_avg, data = data)
+
+data1 <- data %>% 
+  group_by(page) %>% 
+  summarise(correction_avg = mean(correction_rate))
+
+page_view_ordered <- page_view[!is.na(page_view$engaged),]
+data2 <- page_view_ordered %>% 
+  group_by(page) %>% 
+  summarise(avg_engaged = mean(engaged),
+            log_avg_engaged = log(avg_engaged))
+
+
+page_item_count <- item %>%
+  group_by(page) %>% 
+  summarise(n = n())
+
+
+
+merged_data <- merge(data1, page_item_count)
+merged_data <- merge(merged_data, data2)
+
+
+
+
+plot(merged_data$log_avg_engaged~merged_data$n)
+
+```
+
